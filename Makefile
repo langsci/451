@@ -36,25 +36,24 @@ main.snd: main.bbl
 	sed -i 's/.*Commission.*//' main.adx
 	sed -i 's/.*committee.*//' main.adx
 	sed -i 's/.*government.*//' main.adx
-	sed -i 's/.*Direction.*//' main.adx
-	sed -i 's/.*Group.*//' main.adx
-	sed -i 's/.*Ministère.*//' main.adx
-	sed -i 's/.*Statystyczny.*//' main.adx
-	sed -i 's/.*Statistics.*//' main.adx
 	sed -i 's/\\MakeCapital//' main.adx
-	fixindex
+# 	python3 fixindex.py
+# 	mv mainmod.adx main.adx
 	makeindex -o main.and main.adx
+	grep -o  ", [^0-9, \\]*," main.and
 	makeindex -o main.lnd main.ldx
 	makeindex -o main.snd main.sdx 
+	echo "check for doublets in name index"
+	grep -o  ", [^0-9 \\}]*," main.and|sed "s/, //" | sed "s/,\$//"
 	xelatex main 
  
 
 #create a png of the cover
 cover: FORCE
 	convert main.pdf\[0\] -quality 100 -background white -alpha remove -bordercolor "#999999" -border 2  cover.png
-	cp cover.png googlebooks_frontcover.png
-	convert -geometry 50x50% cover.png covertwitter.png
-	convert main.pdf\[0\] -quality 100 -background white -alpha remove -bordercolor "#999999" -border 2  -resize x495 coveromp.png
+# 	cp cover.png googlebooks_frontcover.png
+# 	convert -geometry 50x50% cover.png covertwitter.png
+# 	convert main.pdf\[0\] -quality 100 -background white -alpha remove -bordercolor "#999999" -border 2  -resize x495 coveromp.png
 	display cover.png
 
 openreview: openreview.pdf
@@ -63,12 +62,7 @@ openreview.pdf:
 	pdftk main.pdf multistamp orstamp.pdf output openreview.pdf 
 
 proofreading: proofreading.pdf
-	
-githubrepo: localmetadata.tex proofreading versions.json
-	grep lsID localmetadata.tex |egrep -o "[0-9]*" > ID	
-	git clone https://github.com/langsci/`cat ID`.git
-	cp proofreading.pdf Makefile versions.json `cat ID`
-	mv `cat ID` ..
+
 	
 versions.json: 
 	grep "^.title{" localmetadata.tex|grep -o "{.*"|egrep -o "[^{}]+">title
@@ -101,6 +95,13 @@ paperhive:  proofreading.pdf versions.json README.md
 	git commit -m 'new README' README.md
 	git push
 		
+
+papercurl:
+	$(eval dir=$(shell pwd))
+	$(eval ID=$(shell basename $(dir)))
+	$(eval urlstring="https://paperhive.org/api/document-items/remote?type=langsci&id="$(ID))
+	curl -X POST $(urlstring)
+
 firstedition:
 	git checkout gh-pages
 	git pull origin gh-pages
@@ -122,8 +123,6 @@ chop:
 	egrep -o "\{chapter\}\{Index\}\{[0-9]+\}\{section\*\.[0-9]+\}" main.toc| grep -o "\..*"|egrep -o [0-9]+ >> cuts.txt
 	bash chopchapters.sh `grep "mainmatter starts" main.log|grep -o "[0-9]*" $1 $2`
 	
-chapternames:
-	egrep -o "\{chapter\}\{\\\numberline \{[0-9]+}[A-Z][^\}]+\}" main.toc | egrep -o "[[:upper:]][^\}]+" > chapternames	
 	
 #housekeeping	
 clean:
@@ -142,6 +141,9 @@ realclean: clean
 chapterlist:
 	grep chapter main.toc|sed "s/.*numberline {[0-9]\+}\(.*\).newline.*/\\1/" 
 
+
+chapternames:
+	egrep -o "\{chapter\}\{\\\numberline \{[0-9]+}[A-Z][^\}]+\}" main.toc | egrep -o "[[:upper:]][^\}]+" > chapternames
 
 barechapters:
 	cat chapters/*tex | detex > barechapters.txt
@@ -164,7 +166,7 @@ README.md:
 	echo -n "[Book page on langsci-press.org](http://langsci-press.org/catalog/book/" >> README.md
 	echo  `grep lsID localmetadata.tex|sed "s/.*lsID\}{\(.*\)}/\1)/"` >> README.md 
 	echo "## License" >> README.md
-	echo "Copyright: (c) 2017, the authors." >> README.md
+	echo "Copyright: (c) "`date +"%Y"`", the authors." >> README.md
 	echo "All data, code and documentation in this repository is published under the [Creative Commons Attribution 4.0 Licence](http://creativecommons.org/licenses/by/4.0/) (CC BY 4.0)." >> README.md
 
 	
